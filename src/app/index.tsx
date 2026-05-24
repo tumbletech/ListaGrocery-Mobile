@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
+import { Alert } from "react-native";
 
 type Product = {
   item_no: string;
@@ -65,6 +66,8 @@ export default function HomeScreen() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCartModalVisible, setIsCartModalVisible] = useState(false);
+  const [budgetInput, setBudgetInput] = useState("");
+  const [groceryBudget, setGroceryBudget] = useState<number | null>(null);
 
   const [appMode, setAppMode] = useState<
     "home" | "grocery" | "budget"
@@ -118,7 +121,18 @@ export default function HomeScreen() {
     });
   }, [search, activeCategory, products]);
 
+  const isOverBudget = (nextTotal: number) => {
+    return groceryBudget !== null && nextTotal > groceryBudget;
+  }
+
   const addToCart = (product: Product) => {
+    const nextTotal = totalAmount + Number(product.price);
+
+    if (isOverBudget(nextTotal)) {
+      Alert.alert("Lampas na sa budget", "Hindi na kasya inilaan mong budget");
+      return;
+    }
+    
     const existing = cart.find((item) => item.item_no === product.item_no);
 
     if (existing) {
@@ -148,6 +162,21 @@ export default function HomeScreen() {
   };
 
   const increaseQuantity = (itemNo: string) => {
+    const itemToIncrease = cart.find(
+      (item) => item.item_no === itemNo
+    );
+    
+    if (!itemToIncrease) return;
+
+    const nextTotal = 
+      totalAmount + Number(itemToIncrease.price);
+
+
+    if (isOverBudget(nextTotal)) {
+      Alert.alert("Lampas na sa budget", "Hindi na kasya sa inilaan mong budget");
+      return;
+    }
+    
     setCart(
       cart.map((item) =>
         item.item_no === itemNo
@@ -173,6 +202,8 @@ export default function HomeScreen() {
     (sum, item) => sum + Number(item.price) * item.quantity,
     0
   );
+
+  const remainingBudget = groceryBudget !== null ? groceryBudget - totalAmount: null;
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -213,7 +244,7 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           style={styles.homeButton}
-          onPress={() => setAppMode("grocery")}
+          onPress={() => setAppMode("budget")}
         >
           <Text style={styles.homeButtonTitle}>
             💰 Magse-set lang ng Budget
@@ -226,6 +257,44 @@ export default function HomeScreen() {
 
       </SafeAreaView>
     );
+  }
+
+  if ( appMode === "budget") {
+    return (
+      <SafeAreaView style={styles.homeScreen}>
+        <Text style={styles.logo}>ListaGrocery</Text>
+
+        <Text style={styles.tagline}>Magplano muna bago mamili</Text>
+
+        <View style={styles.budgetCard}>
+          <Text style={styles.budgetTitle}>
+            Magkano ang ilalaan mong budget?
+          </Text>
+
+          <TextInput
+            style={styles.budgetInput}
+            placeholder="₱ 0.00"
+            keyboardType="numeric"
+            value={budgetInput}
+            onChangeText={setBudgetInput}
+          />
+
+          <TouchableOpacity
+            style={styles.homeButton}
+            onPress={() => {
+              setGroceryBudget(Number(budgetInput) || 0);
+              setAppMode("grocery");
+            }}
+          >
+            <Text style={styles.homeButtonTitle}>Simulan ang Grocery</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setAppMode("home")}>
+            <Text style={styles.backHomeText}>Bumalik</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
   }
 
   return (
@@ -309,19 +378,47 @@ export default function HomeScreen() {
         />
       )}
 
-      <View style={styles.cartSummary}>
-        <View>
-          <Text style={styles.cartLabel}>Grocery List</Text>
-          <Text style={styles.cartInfo}>
-            {totalItems} items • ₱{totalAmount.toFixed(2)}
+      <View style={styles.bottomSummary}>
+        
+        <View style={styles.summaryColumn}>
+          <Text style={styles.summaryLabel}>Grocery List</Text>
+
+          <Text style={styles.summaryValue}>
+            {totalItems} items
+          </Text>
+
+          <Text style={styles.summarySubValue}>
+            ₱{totalAmount.toFixed(2)}
+          </Text>
+        </View>
+
+        <View style={styles.summaryDivider} />
+
+        <View style={styles.summaryColumn}>
+          <Text style={styles.summaryLabel}>Budget</Text>
+
+          <Text style={styles.budgetValue}>
+            ₱{groceryBudget?.toFixed(2)}
+          </Text>
+        </View>
+
+        <View style={styles.summaryDivider} />
+
+        <View style={styles.summaryColumn}>
+          <Text style={styles.summaryLabel}>Natitira</Text>
+
+          <Text style={styles.remainingValue}>
+            ₱{remainingBudget?.toFixed(2)}
           </Text>
         </View>
 
         <TouchableOpacity
-          style={styles.viewButton}
-          onPress={() => setIsCartModalVisible(true)}
+          style={styles.viewListButton}
+          onPress={() => setIsCartModalVisible(true)} 
         >
-          <Text style={styles.viewButtonText}>View List</Text>
+            <Text style={styles.viewListButtonText}>
+              View List
+            </Text>
         </TouchableOpacity>
       </View>
 
@@ -424,11 +521,27 @@ export default function HomeScreen() {
               />
             )}
 
-            <View style={styles.modalTotalBox}>
-              <Text style={styles.modalTotalLabel}>Total</Text>
-              <Text style={styles.modalTotalAmount}>
-                ₱{totalAmount.toFixed(2)}
-              </Text>
+              <View style={styles.modalTotalBox}>
+                <View style={styles.modalTotalRow}>
+                  <Text style={styles.modalTotalLabel}>Total</Text>
+                  <Text style={styles.modalTotalAmount}>
+                    ₱{totalAmount.toFixed(2)}
+                  </Text>
+                </View>
+
+                {groceryBudget !== null && (
+                  <View style={styles.modalRemainingBox}>
+                    <Text style={styles.modalTotalLabel}>Natitira</Text>
+                    <Text
+                      style={[
+                        styles.modalRemainingAmount,
+                        remainingBudget !== null && remainingBudget < 0 && styles.overBudgetText,
+                      ]}
+                    >
+                      ₱{remainingBudget?.toFixed(2)}
+                    </Text>
+              </View>
+              )}
             </View>
           </View>
         </View>
@@ -565,19 +678,6 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: "#ffffff",
     fontWeight: "900",
-  },
-
-  cartSummary: {
-    position: "absolute",
-    left: 20,
-    right: 20,
-    bottom: 24,
-    backgroundColor: "#14532d",
-    borderRadius: 22,
-    padding: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
   },
 
   cartLabel: {
@@ -795,5 +895,129 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     color: "#666",
+  },
+
+  budgetCard: {
+    backgroundColor: "#ffffff",
+    padding: 22,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#d8e5d2",
+    marginTop: 24,
+  },
+
+  budgetTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#14532d",
+    marginBottom: 16,
+  },
+
+  budgetInput: {
+    height: 56,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    fontSize: 20,
+    marginBottom: 18,
+    backgroundColor: "#f8fafc",
+  },
+
+  backHomeText: {
+    textAlign: "center",
+    color: "#64748b",
+    fontWeight: "700",
+    marginTop: 16,
+  },
+
+  bottomSummary: {
+    position: "absolute",
+    bottom: 20,
+    left: 16,
+    right: 16,
+    backgroundColor: "#166534",
+    borderRadius: 24,
+    padding: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  summaryColumn: {
+    flex: 1,
+  },
+
+  summaryLabel: {
+    color: "#d1fae5",
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+
+  summaryValue: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+
+  summarySubValue: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+
+  budgetValue: {
+    color: "#93c5fd",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+
+  remainingValue: {
+    color: "#facc15",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+
+  summaryDivider: {
+    width: 1,
+    height: 60,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    marginHorizontal: 14,
+  },
+
+  viewListButton: {
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 16,
+    marginLeft: 12,
+  },
+
+  viewListButtonText: {
+    color: "#14532d",
+    fontWeight: "800",
+    fontSize: 14,
+  },
+
+  modalTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  modalRemainingBox: {
+    alignItems: "flex-end",
+  },
+
+  modalRemainingAmount: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#facc15",
+  },
+
+  overBudgetText: {
+    color: "#dc2826",
   },
 });
