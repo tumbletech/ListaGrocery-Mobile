@@ -78,10 +78,14 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [isCartModalVisible, setIsCartModalVisible] = useState(false);
   const [isRiceModalVisible, setIsRiceModalVisible] = useState(false);
+  const [isCustomItemModalVisible, setIsCustomItemModalVisible] = useState(false);
+  const [customItemName, setCustomItemName] = useState("");
+  const [customItemPrice, setCustomItemPrice] = useState("");
+  const [customItemQuantity, setCustomItemQuantity] = useState("1");
   const [budgetInput, setBudgetInput] = useState("");
   const [groceryBudget, setGroceryBudget] = useState<number | null>(null);
 
-  const [appMode, setAppMode] = useState<"home" | "grocery" | "budget">(
+  const [appMode, setAppMode] = useState<"home" | "grocery" | "budget" | "review">(
     "home"
   );
 
@@ -333,6 +337,115 @@ export default function HomeScreen() {
       </SafeAreaView>
     );
   }
+
+  if (appMode === "review") {
+    return (
+      <SafeAreaView style={styles.screen}>
+        <View style={styles.reviewHeader}>
+          <Text style={styles.logo}>ListaGrocery</Text>
+          <Text style={styles.tagline}>Final grocery review</Text>
+        </View>
+
+        <FlatList
+          data={cart}
+          keyExtractor={(item) => item.cart_id}
+          contentContainerStyle={styles.reviewList}
+          renderItem={({ item }) => (
+            <View style={styles.reviewItem}>
+              <View style={styles.reviewItemLeft}>
+                <Text style={styles.reviewItemName}>
+                  {item.brand} {item.product_name}
+                </Text>
+
+                <Text style={styles.reviewItemMeta}>
+                  {item.unit} • Qty: {item.quantity}
+                </Text>
+              </View>
+
+              <Text style={styles.reviewItemPrice}>
+                ₱{(Number(item.price) * item.quantity).toFixed(2)}
+              </Text>
+            </View>
+          )}
+        />
+
+        <View style={styles.reviewSummary}>
+          <Text style={styles.reviewSummaryLabel}>Estimated Total</Text>
+          <Text style={styles.reviewSummaryAmount}>
+            ₱{totalAmount.toFixed(2)}
+          </Text>
+
+          {groceryBudget !== null && (
+            <>
+              <Text style={styles.reviewRemainingText}>
+                Natitira: ₱{remainingBudget?.toFixed(2)}
+              </Text>
+            </>
+          )}
+
+          <TouchableOpacity
+            style={styles.reviewSecondaryButton}
+            onPress={() => {
+              setAppMode("grocery");
+              setIsCustomItemModalVisible(true);
+            }}
+            >
+              <Text style={styles.customItemButtonText}>
+                + Magdagdag ng wala sa listahan
+              </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.reviewPrimaryButton}
+            onPress={() => setAppMode("grocery")}
+          >
+            <Text style={styles.reviewPrimaryButtonText}>
+              Back to Edit
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.reviewSecondaryButton}
+            onPress={() => setIsCartModalVisible(true)}
+          >
+            <Text style={styles.reviewSecondaryButtonText}>
+              Start Grocery
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const addCustomItem = () => {
+    if(!customItemName.trim()) {
+      Alert.alert("Missing Item", "Pakilagay ang pangalan ng item");
+      return;
+    }
+
+    const price = Number(customItemPrice) || 0;
+    const quantity = Number(customItemQuantity) || 1;
+
+    const customProduct: CartItem = {
+      item_no: `CUSTOM-${Date.now()}`,
+      main_category: "Custom",
+      sub_category: "Custom Item",
+      brand: "Custom",
+      product_name: customItemName.trim(),
+      unit: "custom",
+      price,
+      cart_id: Date.now().toString(),
+      quantity,
+      bought: false,
+    };
+
+    setCart([...cart, customProduct]);
+
+    setCustomItemName("");
+    setCustomItemPrice("");
+    setCustomItemQuantity("1");
+    setIsCustomItemModalVisible(false);
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -652,7 +765,63 @@ export default function HomeScreen() {
                   </View>
                 )}
               </View>
+
+              <TouchableOpacity
+                style={styles.checkoutButton}
+                onPress={() => {
+                  setIsCartModalVisible(false);
+                  setAppMode("review");
+                }}
+              >
+                <Text style={styles.checkoutButtonText}>
+                  Review Grocery List
+                </Text>
+              </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isCustomItemModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsCustomItemModalVisible(false)}
+      > 
+        <View style={styles.centerModalOverlay}>
+          <View style={styles.customItemModal}>
+            <Text style={styles.modalTitle}>Custom Item</Text>
+            
+            <TextInput
+              style={styles.customInput}
+              placeholder="Pangalan ng item"
+              value={customItemName}
+              onChangeText={setCustomItemName}
+            />
+
+            <TextInput
+              style={styles.customInput}
+              placeholder="Presyo"
+              keyboardType="numeric"
+              value={customItemPrice}
+              onChangeText={setCustomItemPrice}
+            />
+
+            <TextInput
+              style={styles.customInput}
+              placeholder="Quantity"
+              keyboardType="numeric"
+              value={customItemQuantity}
+              onChangeText={setCustomItemQuantity}
+            />
+
+            <TouchableOpacity style={styles.checkoutButton} onPress={addCustomItem}>
+              <Text style={styles.checkoutButtonText}>Add Custom Item</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => setIsCustomItemModalVisible(false)}>
+              <Text style={styles.backHomeText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1176,4 +1345,157 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 16,
   },
+
+  reviewHeader: {
+  paddingHorizontal: 20,
+  paddingTop: 24,
+  paddingBottom: 10,
+},
+
+reviewList: {
+  padding: 20,
+  paddingBottom: 360,
+},
+
+reviewItem: {
+  backgroundColor: "#ffffff",
+  borderRadius: 16,
+  padding: 14,
+  marginBottom: 10,
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+},
+
+reviewItemLeft: {
+  flex: 1,
+  marginRight: 10,
+},
+
+reviewItemName: {
+  fontSize: 15,
+  fontWeight: "900",
+  color: "#111827",
+},
+
+reviewItemMeta: {
+  marginTop: 4,
+  color: "#64748b",
+  fontSize: 12,
+},
+
+reviewItemPrice: {
+  fontSize: 15,
+  fontWeight: "900",
+  color: "#14532d",
+},
+
+reviewSummary: {
+  position: "absolute",
+  left: 16,
+  right: 16,
+  bottom: 20,
+  backgroundColor: "#14532d",
+  borderRadius: 24,
+  padding: 18,
+},
+
+reviewSummaryLabel: {
+  color: "#bbf7d0",
+  fontSize: 13,
+  fontWeight: "700",
+},
+
+reviewSummaryAmount: {
+  color: "#ffffff",
+  fontSize: 30,
+  fontWeight: "900",
+  marginTop: 4,
+},
+
+reviewBudgetText: {
+  color: "#93c5fd",
+  fontWeight: "800",
+  marginTop: 8,
+},
+
+reviewRemainingText: {
+  color: "#facc15",
+  fontWeight: "800",
+  marginTop: 4,
+},
+
+reviewPrimaryButton: {
+  backgroundColor: "#ffffff",
+  paddingVertical: 12,
+  borderRadius: 14,
+  marginTop: 16,
+  alignItems: "center",
+},
+
+reviewPrimaryButtonText: {
+  color: "#14532d",
+  fontWeight: "900",
+},
+
+reviewSecondaryButton: {
+  backgroundColor: "#dcfce7",
+  paddingVertical: 12,
+  borderRadius: 14,
+  marginTop: 10,
+  alignItems: "center",
+},
+
+reviewSecondaryButtonText: {
+  color: "#166534",
+  fontWeight: "900",
+},
+
+checkoutButton: {
+  backgroundColor: "#16a34a",
+  paddingVertical: 12,
+  borderRadius: 14,
+  marginTop: 16,
+  alignItems: "center",
+},
+
+checkoutButtonText: {
+  color: "#ffffff",
+  fontWeight: "900",
+},
+
+customItemButton: {
+  marginHorizontal: 20,
+  marginTop: 12,
+  backgroundColor: "#ffffff",
+  borderWidth: 1,
+  borderColor: "#16a34a",
+  borderRadius: 14,
+  paddingVertical: 12,
+  alignItems: "center",
+},
+
+customItemButtonText: {
+  color: "#14532d",
+  fontWeight: "900",
+},
+
+customItemModal: {
+  backgroundColor: "#ffffff",
+  borderRadius: 24,
+  padding: 22,
+},
+
+customInput: {
+  height: 52,
+  borderWidth: 1,
+  borderColor: "#d1d5db",
+  borderRadius: 14,
+  paddingHorizontal: 14,
+  fontSize: 16,
+  backgroundColor: "#f8fafc",
+  marginTop: 12,
+},
 });
